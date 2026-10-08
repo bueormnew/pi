@@ -1,0 +1,44 @@
+{
+  "connectors": {
+    "runbook": {
+      "commands": {
+        "search": {
+          "description": "Search the internal runbook index by keyword",
+          "kind": "http",
+          "method": "GET",
+          "url": "http://runbook.internal:8080/api/search?q={{query}}&limit={{limit}}",
+          "params": {
+            "query": { "type": "string", "description": "Keywords" },
+            "limit": { "type": "number", "description": "Maximum hits", "default": 10 }
+          },
+          "readOnly": true
+        }
+      }
+    },
+    "tickets": {
+      "commands": {
+        "list": {
+          "description": "List my open tickets from the ticketing CLI",
+          "kind": "command",
+          "argv": ["tk", "list", "--mine", "--state={{state:open}}", "--json"],
+          "params": { "state": { "type": "string", "description": "Ticket state", "default": "open" } },
+          "readOnly": true
+        }
+      }
+    },
+    "gmail_local": {
+      "commands": {
+        "search": {
+          "description": "Gmail via a CLI that already holds the OAuth token",
+          "kind": "command",
+          "argv": ["gog", "messages", "search", "{{query}}", "--max", "{{limit}}"],
+          "params": {
+            "query": { "type": "string", "description": "Gmail search syntax" },
+            "limit": { "type": "number", "description": "Maximum messages", "default": 20 }
+          },
+          "readOnly": true
+        }
+      }
+    }
+  }
+}
