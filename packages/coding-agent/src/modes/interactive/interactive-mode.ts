@@ -35,8 +35,6 @@ import {
 	type Component,
 	Container,
 	fuzzyFilter,
-	getCapabilities,
-	hyperlink,
 	Markdown,
 	matchesKey,
 	Spacer,
@@ -103,7 +101,6 @@ import {
 	resolveModelScopeFromModels,
 } from "../../core/model-resolver.ts";
 import { CredentialSynchronizationError } from "../../core/model-runtime.ts";
-import { DefaultPackageManager } from "../../core/package-manager.ts";
 import { RADIUS_MCP_URL, RADIUS_PROVIDER_ID } from "../../core/radius.ts";
 import type { ResourceDiagnostic } from "../../core/resource-loader.ts";
 import { formatMissingSessionCwdPrompt, MissingSessionCwdError } from "../../core/session-cwd.ts";
@@ -132,7 +129,6 @@ import { getPiUserAgent } from "../../utils/pi-user-agent.ts";
 import { killTrackedDetachedChildren } from "../../utils/shell.ts";
 import { loadAllHighlightLanguages } from "../../utils/syntax-highlight.ts";
 import { ensureTool, type ToolStatus } from "../../utils/tools-manager.ts";
-import { checkForNewPiVersion, type LatestPiRelease } from "../../utils/version-check.ts";
 import { reportBug } from "./bug-report.ts";
 import { createChatViewport } from "./chat-viewport.ts";
 import { ArminComponent } from "./components/armin.ts";
@@ -425,7 +421,6 @@ function formatLoginProviderCompletionDescription(provider: LoginProviderComplet
  */
 export interface InteractiveModeOptions {
 	/** Providers that were migrated to auth.json (shows warning) */
-	migratedProviders?: string[];
 	/** Diagnostics collected before the interactive TUI was initialized. */
 	startupDiagnostics?: AgentSessionRuntimeDiagnostic[];
 	/** Warning message if session model couldn't be restored */
@@ -1155,28 +1150,6 @@ export class InteractiveMode {
 				.finally(() => clearTimeout(timeout));
 		}
 
-		// Start version check asynchronously
-		checkForNewPiVersion(this.version).then((newRelease) => {
-			if (newRelease) {
-				this.showNewVersionNotification(newRelease);
-			}
-		});
-
-		// Start package update check asynchronously
-		this.checkForPackageUpdates()
-			.then((updates) => {
-				if (updates.length > 0) {
-					this.showPackageUpdateNotification(updates);
-				}
-			})
-			.finally(() => {
-				// On Windows, npm can overwrite the shared console title while checking
-				// extension package versions. Restore Pi's title after the startup check.
-				if (process.platform === "win32" && this.isInitialized) {
-					this.updateTerminalTitle();
-				}
-			});
-
 		// Check tmux keyboard setup asynchronously
 		this.checkTmuxKeyboardSetup().then((warning) => {
 			if (warning) {
@@ -1185,14 +1158,7 @@ export class InteractiveMode {
 		});
 
 		// Show startup warnings
-		const {
-			migratedProviders,
-			startupDiagnostics,
-			modelFallbackMessage,
-			initialMessage,
-			initialImages,
-			initialMessages,
-		} = this.options;
+		const { startupDiagnostics, modelFallbackMessage, initialMessage, initialImages, initialMessages } = this.options;
 
 		for (const diagnostic of startupDiagnostics ?? []) {
 			if (diagnostic.type === "error") {
@@ -1202,10 +1168,6 @@ export class InteractiveMode {
 			} else {
 				this.showStatus(diagnostic.message);
 			}
-		}
-
-		if (migratedProviders && migratedProviders.length > 0) {
-			this.showWarning(`Migrated credentials to auth.json: ${migratedProviders.join(", ")}`);
 		}
 
 		const modelsJsonError = this.session.modelRuntime.getError();
@@ -1257,24 +1219,6 @@ export class InteractiveMode {
 				const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
 				this.showError(errorMessage);
 			}
-		}
-	}
-
-	private async checkForPackageUpdates(): Promise<string[]> {
-		if (process.env.PI_OFFLINE) {
-			return [];
-		}
-
-		try {
-			const packageManager = new DefaultPackageManager({
-				cwd: this.sessionManager.getCwd(),
-				agentDir: getAgentDir(),
-				settingsManager: this.settingsManager,
-			});
-			const updates = await packageManager.checkForAvailableUpdates();
-			return updates.map((update) => update.displayName);
-		} catch {
-			return [];
 		}
 	}
 
@@ -4629,58 +4573,6 @@ export class InteractiveMode {
 	showWarning(warningMessage: string): void {
 		this.chatContainer.addChild(new Spacer(1));
 		this.chatContainer.addChild(new ThemedText(() => theme.fg("warning", `Warning: ${warningMessage}`), 1, 0));
-		this.ui.requestRender();
-	}
-
-	showNewVersionNotification(release: LatestPiRelease): void {
-		const updateInstruction = () =>
-			theme.fg("muted", `New version ${release.version} is available. Run `) +
-			theme.fg("accent", `${APP_NAME} update`);
-		const changelogUrl = "https://pi.dev/changelog";
-		const changelogLine = () => {
-			const changelogLink = getCapabilities().hyperlinks
-				? hyperlink(theme.fg("accent", changelogUrl), changelogUrl)
-				: theme.fg("accent", changelogUrl);
-			return theme.fg("muted", "Changelog: ") + changelogLink;
-		};
-		const note = release.note?.trim();
-
-		this.chatContainer.addChild(new Spacer(1));
-		this.chatContainer.addChild(new DynamicBorder((text) => theme.fg("warning", text)));
-		this.chatContainer.addChild(
-			new ThemedText(() => `${theme.bold(theme.fg("warning", "Update Available"))}\n${updateInstruction()}`, 1, 0),
-		);
-		if (note) {
-			this.chatContainer.addChild(new Spacer(1));
-			this.chatContainer.addChild(
-				new Markdown(note, 1, 0, this.getMarkdownThemeWithSettings(), {
-					color: (text) => theme.fg("muted", text),
-				}),
-			);
-			this.chatContainer.addChild(new Spacer(1));
-		}
-		this.chatContainer.addChild(new ThemedText(changelogLine, 1, 0));
-		this.chatContainer.addChild(new DynamicBorder((text) => theme.fg("warning", text)));
-		this.ui.requestRender();
-	}
-
-	showPackageUpdateNotification(packages: string[]): void {
-		const updateInstruction = () =>
-			theme.fg("muted", "Package updates are available. Run ") +
-			theme.fg("accent", `${APP_NAME} update --extensions`);
-		const packageLines = packages.map((pkg) => `- ${pkg}`).join("\n");
-
-		this.chatContainer.addChild(new Spacer(1));
-		this.chatContainer.addChild(new DynamicBorder((text) => theme.fg("warning", text)));
-		this.chatContainer.addChild(
-			new ThemedText(
-				() =>
-					`${theme.bold(theme.fg("warning", "Package Updates Available"))}\n${updateInstruction()}\n${theme.fg("muted", "Packages:")}\n${packageLines}`,
-				1,
-				0,
-			),
-		);
-		this.chatContainer.addChild(new DynamicBorder((text) => theme.fg("warning", text)));
 		this.ui.requestRender();
 	}
 
