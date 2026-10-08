@@ -1,0 +1,50 @@
+{
+  "$schema": "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/schemas/models.schema.json",
+  "providers": {
+    "ollama": {
+      "name": "Ollama",
+      "baseUrl": "http://localhost:11434/v1",
+      "api": "openai-completions",
+      "apiKey": "ollama",
+      "models": [
+        { "id": "qwen2.5-coder:7b", "name": "Qwen2.5 Coder 7B", "contextWindow": 32768, "maxTokens": 8192, "input": ["text"] }
+      ]
+    },
+    "lmstudio": {
+      "name": "LM Studio",
+      "baseUrl": "http://localhost:1234/v1",
+      "api": "openai-completions",
+      "apiKey": "lmstudio",
+      "models": [
+        { "id": "qwen2.5-coder-32b-instruct", "name": "Qwen2.5 Coder 32B (local)", "contextWindow": 32768, "maxTokens": 8192, "input": ["text", "image"] }
+      ]
+    },
+    "vllm-internal": {
+      "name": "vLLM (internal gateway)",
+      "baseUrl": "$VLLM_BASE_URL",
+      "api": "openai-completions",
+      "apiKey": "$VLLM_API_KEY",
+      "headers": { "x-org": "myteam" },
+      "models": [
+        {
+          "id": "meta-llama/Llama-3.3-70B-Instruct",
+          "name": "Llama 3.3 70B",
+          "reasoning": false,
+          "contextWindow": 131072,
+          "maxTokens": 16384,
+          "input": ["text"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        }
+      ]
+    },
+    "anthropic-proxy": {
+      "name": "Anthropic-format proxy",
+      "baseUrl": "$ANTHROPIC_BASE_URL",
+      "api": "anthropic-messages",
+      "apiKey": "!security find-generic-password -s anthropic-proxy -w",
+      "models": [
+        { "id": "claude-sonnet-4-5", "name": "Claude Sonnet 4.5 (via proxy)", "contextWindow": 200000, "maxTokens": 64000 }
+      ]
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "mode": "code",
+  "models": {
+    "plan": "anthropic/claude-opus-4-8",
+    "work": "vllm-internal/meta-llama/Llama-3.3-70B-Instruct",
+    "code": "lmstudio/qwen2.5-coder-32b-instruct"
+  }
+}
